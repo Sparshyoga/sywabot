@@ -1,25 +1,24 @@
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const axios = require('axios');
+import express from 'express';
+import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
+
+dotenv.config(); // load variables from .env file
 
 const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-
-// Webhook Verification (Required by Meta)
+// Verification endpoint
 app.get('/webhook', (req, res) => {
+    const verifyToken = process.env.VERIFY_TOKEN;
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
     if (mode && token) {
-        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-            console.log('Webhook Verified');
+        if (mode === 'subscribe' && token === verifyToken) {
+            console.log('WEBHOOK_VERIFIED');
             res.status(200).send(challenge);
         } else {
             res.sendStatus(403);
@@ -27,61 +26,35 @@ app.get('/webhook', (req, res) => {
     }
 });
 
-// Handle Incoming Messages
-app.post('/webhook', async (req, res) => {
-    try {
-        const body = req.body;
+// Message handling endpoint
+app.post('/webhook', (req, res) => {
+    const body = req.body;
 
-        if (body.object) {
-            if (
-                body.entry &&
-                body.entry[0].changes &&
-                body.entry[0].changes[0].value.messages &&
-                body.entry[0].changes[0].value.messages[0]
-            ) {
-                const phone_number_id = PHONE_NUMBER_ID;
-                const from = body.entry[0].changes[0].value.messages[0].from; // sender ID
-                const msg_body = body.entry[0].changes[0].value.messages[0].text.body;
+    if (body.object === 'whatsapp_business_account') {
+        const phone_number_id = process.env.PHONE_NUMBER_ID;
+        const access_token = process.env.ACCESS_TOKEN;
 
-                console.log('Received Message:', msg_body);
+        body.entry.forEach(entry => {
+            const changes = entry.changes;
+            if (changes && changes.length > 0) {
+                const message = changes[0].value.messages?.[0];
+                if (message) {
+                    const from = message.from;
+                    const msg_body = message.text?.body;
 
-                // Simple Logic
-                let reply = "Welcome! Reply '1' for pricing, '2' for location.";
+                    console.log(`Received message from ${from}: ${msg_body}`);
 
-                if (msg_body === '1') {
-                    reply = "Here is our pricing: https://yourwebsite.com/pricing";
-                } else if (msg_body === '2') {
-                    reply = "Our location: https://maps.google.com/yourlocation";
+                    // Here you can add reply logic
                 }
-
-                await axios({
-                    method: 'POST',
-                    url: `https://graph.facebook.com/v19.0/${phone_number_id}/messages`,
-                    headers: {
-                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    data: {
-                        messaging_product: 'whatsapp',
-                        to: from,
-                        text: { body: reply }
-                    }
-                });
-
-                console.log('Reply sent:', reply);
             }
+        });
 
-            res.sendStatus(200);
-        } else {
-            res.sendStatus(404);
-        }
-    } catch (error) {
-        console.error('Error handling message:', error);
-        res.sendStatus(500);
+        res.sendStatus(200);
+    } else {
+        res.sendStatus(404);
     }
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+app.listen(port, () => {
+    console.log(`Webhook server running on port ${port}`);
 });
