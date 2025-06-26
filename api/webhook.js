@@ -12,8 +12,10 @@ export default async function handler(req, res) {
         console.log("WEBHOOK_VERIFIED");
         res.status(200).send(challenge);
       } else {
-        res.sendStatus(403);
+        res.status(403).send('Forbidden');
       }
+    } else {
+      res.status(400).send('Bad Request');
     }
   } else if (req.method === 'POST') {
     const body = req.body;
@@ -52,14 +54,14 @@ export default async function handler(req, res) {
           await sendMessage(`Sorry, I didn't get that.\nPlease reply with:\n1️⃣ Pricing Details\n2️⃣ Location\n3️⃣ Book a Free Trial`);
         }
 
-        res.sendStatus(200);
+        res.status(200).send('OK');
       } else {
-        res.sendStatus(404);
+        res.status(404).send('Message not found');
       }
     } else {
-      res.sendStatus(404);
+      res.status(404).send('Not a valid webhook payload');
     }
   } else {
-    res.sendStatus(405);
+    res.status(405).send('Method Not Allowed');
   }
 }
